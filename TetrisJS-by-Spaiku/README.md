@@ -1,3 +1,4 @@
 # Importante
 
-- Seguir función update del game loop
+- Intentar la compatibilidad mobile
+- Agregar las piezas faltantes

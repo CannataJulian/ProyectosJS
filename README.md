@@ -1,4 +1,4 @@
 # ProyectosJS
 
-- Tetris
-- A decidir
+- Tetris (LISTO)
+- ChatGPT local
