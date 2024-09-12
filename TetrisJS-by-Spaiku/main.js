@@ -199,7 +199,7 @@ document.addEventListener('keydown', event => {
 
       rotated.push(row)
     }
-
+    
     const previousShape = piece.shape
     piece.shape = rotated
     if (checkCollision()) {
