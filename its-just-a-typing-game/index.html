@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>It's Just a Typing Game - by Julian Cannata</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+  <link rel="icon" href="./keyboard.png">
+</head>
+
+
+<style>
+  :root {
+    color-scheme: light dark;
+    --red: #ca4754;
+    --green: #00b755;
+    --blue: #3647e0;
+    --yellow: #daaf38;
+    --black: #222;
+    --grey: #999;
+    --white: #e7e7e7;
+  }
+
+  body {
+    background: var(--black);
+
+    /* space-mono-bold */
+    font-family: "Space Mono", monospace;
+    font-weight: 700;
+    font-style: normal;
+    color: var(--white);
+
+    display: grid;
+    place-content: center;
+    margin-top: 32px;
+    padding: 32px;
+  }
+
+  section {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 500px;
+  }
+
+  time {
+    color: var(--yellow);
+  }
+
+  input {
+    z-index: -999;
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  p {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin: 0;
+  }
+
+  x-letter {
+    color: var(--grey);
+    position: relative;
+
+    &.active::before {
+      content: '|';
+      color: var(--yellow);
+      font-size: 16px;
+      position: absolute;
+      left: -60%;
+      animation: 1s blink infinite ease-in-out;
+    }
+
+    &.active.is-last::before {
+      left: 60%;
+    }
+
+    &.correct {
+      color: var(--green);
+    }
+
+    &.incorrect {
+      color: var(--red);
+    }
+
+  }
+
+  x-word {
+    border-bottom: 1.5px solid transparent;
+    transition: border-color 0.2s ease-in-out;
+
+    &.marked {
+      border-color: var(--red);
+    }
+  }
+
+  @keyframes blink {
+    0%, 25% {
+      opacity: 1;
+    }
+
+    75% {
+      opacity: 0;
+    }
+  }
+
+  #game {
+    display: flex;
+  }
+
+  #results {
+    display: none;
+  }
+
+  header {
+    padding: 16px
+  }
+
+  h2 {
+    opacity: 0.5;
+    margin: 0;
+    font-size: 18px;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 24px;
+    color: var(--blue);
+  }
+
+  button {
+    background: transparent;
+    border: 0;
+    margin-top: 8px;
+    margin-left: 8px;
+    padding: 16px;
+    opacity: 0.5;
+    display: inline-block;
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+    cursor: pointer;
+    border-radius: 16px;
+
+    &:hover{
+      background: #444;
+      opacity: 1;
+      scale: 1.1;
+    }
+  }
+
+</style>
+
+<body>
+  <main>
+    <header>
+      <h1>It's Just a Typing Game ⌨</h1>
+      <h2>Type for play!</h2>
+    </header>
+
+    <section id="game">
+      <time></time>
+      <p></p>
+      <input type="text" id="inputMobile" autofocus>
+    </section>
+
+    <section id="results">
+
+      <h2>wpm/ppm</h2>
+      <h3 id="results-wpm"></h3>
+
+      <h2>accuracy/precisión</h2>
+      <h3 id="results-accuracy"></h3>
+
+    </section>
+    <button id="reload-button">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-reload">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+        <path d="M19.933 13.041a8 8 0 1 1 -9.925 -8.788c3.899 -1 7.935 1.007 9.425 4.747" />
+        <path d="M20 4v5h-5" />
+      </svg>
+    </button>
+  </main>
+</body>
+
+<script type="module">
+  import { words as INITIAL_WORDS } from './data.js'
+
+  const $time = document.querySelector('time');
+  const $paragraph = document.querySelector('p');
+  const $input = document.querySelector('input');
+  const $game = document.querySelector('#game')
+  const $results = document.querySelector('#results')
+  const $wpm = $results.querySelector('#results-wpm')
+  const $accuracy = $results.querySelector('#results-accuracy')
+  const $button = document.querySelector('#reload-button')
+
+  const INITIAL_TIME = 30;
+
+  // const TEXT = 'this is an attempt to make a typing game for fun and learning using vanilla js for typing test speed'
+
+  let words = []
+  let currentTime = INITIAL_TIME;
+  let playing
+
+  initGame()
+  initEvents()
+  
+  window.onload = function() {
+    var campoDeEntrada = document.getElementById('inputMobile');
+    if (campoDeEntrada) {
+        setTimeout(function() {
+            campoDeEntrada.focus();
+        }, 100);
+    }
+};
+
+  function initGame() {
+    $game.style.display = 'flex'
+    $results.style.display = 'none'
+    $input.value = ''
+
+    playing = false
+
+    words = INITIAL_WORDS.toSorted(
+      () => Math.random() - 0.5
+    ).slice(0, 50)
+    currentTime = INITIAL_TIME
+
+    $time.textContent = currentTime
+
+    $paragraph.innerHTML = words.map((word, index) => {
+      const letters = word.split('')
+
+      return `<x-word>
+        ${letters
+          .map(letter => `<x-letter>${letter}</x-letter>`)
+          .join('')
+        }
+      </x-word>
+      `
+    }).join('')
+
+    const $firstWord = $paragraph.querySelector('x-word')
+    $firstWord.classList.add('active')
+    $firstWord.querySelector('x-letter').classList.add('active')
+  }
+
+  function initEvents() {
+    document.addEventListener('keydown', () => {
+      $input.focus()
+      if (!playing) {
+        playing = true
+        const intervalId = setInterval(() => {
+          currentTime--
+          $time.textContent = currentTime
+
+          if (currentTime === 0) {
+            clearInterval(intervalId)
+            gameOver()
+          }
+        }, 1000)
+      }
+    })
+    $input.addEventListener('keydown', onKeyDown)
+    $input.addEventListener('keyup', onKeyUp)
+    $button.addEventListener('click', initGame)
+  }
+
+  /* PRueba onKeyDown
+  function onKeyDown(event) {
+    const $currentWord = $paragraph.querySelector('x-word.active')
+    const $currentLetter = $currentWord.querySelector('x-letter.active')
+
+    const { key } = event
+    if (key === ' ') {
+      event.preventDefault() // Prevengo el input del espacio.
+
+      const $nextWord = $currentWord.nextElementSibling // Recupero el siguiente elemento.
+      const $nextLetter = $nextWord.querySelector('x-letter')
+
+      $currentWord.classList.remove('active', 'marked')
+      $currentLetter.classList.remove('active')
+
+      $nextWord.classList.add('active')
+      $nextLetter.classList.add('active')
+
+      $input.value = ''
+
+      const hasMissedLetters = $currentWord
+        .querySelectorAll('x-letter:not(.correct)').length > 0 // Se obtienen todas las letras que no sean correctas.
+
+      const classToAdd = hasMissedLetters ? 'marked' : 'correct' // Si las hay la "marca", de lo contrario es correcta.
+      $currentWord.classList.add(classToAdd)
+      return
+    }
+
+    
+    if (key === 'Backspace') {
+      const $previousWord = $currentWord.previousElementSibling 
+      const $previousLetter = $currentLetter.previousElementSibling
+
+      if (!$previousWord && !$previousLetter) {
+        event.preventDefault()
+        return
+      }
+
+      const $wordMarked = $paragraph.querySelector('x-word.marked')
+      if ($wordMarked && !$previousLetter) {
+        event.preventDefault()
+        $previousWord.classList.remove('marked')
+        $previousWord.classList.add('active')
+
+        
+        const $letterToGo = $previousWord.querySelector('x-letter:last-child')
+
+        $currentLetter.classList.remove('active')
+        $letterToGo.classList.add('active')
+
+        
+        $input.value = [
+          ...$previousWord.querySelectorAll('x-letter.correct, x-letter.incorrect')
+        ].map($element => {
+          return $element.classList.contains('correct') ? $element.innerText : '*'
+        })
+          .join('')
+      }
+    }
+  }
+*/
+
+  function onKeyDown(event) {
+    const $currentWord = $paragraph.querySelector('x-word.active')
+    const $currentLetter = $currentWord.querySelector('x-letter.active')
+
+    const { key } = event
+    if (key === ' ') {
+      event.preventDefault()
+
+      const $nextWord = $currentWord.nextElementSibling
+      const $nextLetter = $nextWord.querySelector('x-letter')
+
+      $currentWord.classList.remove('active', 'marked')
+      $currentLetter.classList.remove('active')
+
+      $nextWord.classList.add('active')
+      $nextLetter.classList.add('active')
+
+      $input.value = ''
+
+      const hasMissedLetters = $currentWord
+        .querySelectorAll('x-letter:not(.correct)').length > 0
+
+      const classToAdd = hasMissedLetters ? 'marked' : 'correct'
+      $currentWord.classList.add(classToAdd)
+
+      return
+    }
+    
+    // Permite volver a corregir una palabra mal escrita.
+    if (key === 'Backspace') {
+      const $previousWord = $currentWord.previousElementSibling // Recupero el elemento anterior.
+      const $previousLetter = $currentLetter.previousElementSibling
+
+      if (!$previousWord && !$previousLetter) { // Si están incorrectas
+        event.preventDefault()
+        return
+      }
+
+      const $wordMarked = $paragraph.querySelector('x-word.marked')
+      if ($wordMarked && !$previousLetter) {
+        event.preventDefault()
+        $previousWord.classList.remove('marked')
+        $previousWord.classList.add('active')
+
+        // Tengo que saber que letra de esa palabra es para volver y corregir.
+        const $letterToGo = $previousWord.querySelector('x-letter:last-child')
+
+        $currentLetter.classList.remove('active')
+        $letterToGo.classList.add('active')
+
+        // Actualizo el input recuperando todas las letras ingresadas por el usuario.
+        $input.value = [
+          ...$previousWord.querySelectorAll('x-letter.correct, x-letter.incorrect')
+        ].map($element => { // Lo transformo en un array para utilizar el .map y que devuelva la funcion.
+          return $element.classList.contains('correct') ? $element.innerText : '*' // Comprueba si está presente la clase, de lo contrario lo reemplaza por un *.
+        })
+          .join('') // Se concatenan los elemento del array en una sola cadena y se asigna al input.
+      }
+    }
+  }
+
+  function onKeyUp() {
+    // Recuperamos los elementos actuales
+    const $currentWord = $paragraph.querySelector('x-word.active')
+    const $currentLetter = $currentWord.querySelector('x-letter.active')
+
+    const currentWord = $currentWord.innerText.trim()
+    $input.maxLength = currentWord.length
+
+    const $allLetters = $currentWord.querySelectorAll('x-letter')
+
+    $allLetters.forEach($letter => $letter.classList.remove('correct', 'incorrect'))
+
+    $input.value.split('').forEach((char, index) => {
+      const $letter = $allLetters[index]
+      const letterToCheck = currentWord[index]
+
+      const isCorrect = char === letterToCheck
+      const letterClass = isCorrect ? 'correct' : 'incorrect'
+      $letter.classList.add(letterClass)
+    })
+
+    $currentLetter.classList.remove('active', 'is-last')
+    const inputLenght = $input.value.length
+    const $nextActiveLetter = $allLetters[inputLenght]
+
+    if ($nextActiveLetter) {
+      $nextActiveLetter.classList.add('active')
+    } else {
+      $currentLetter.classList.add('active', 'is-last')
+      // Game Over si no hay una próxima palabra
+    }
+  }
+
+  function gameOver() {
+    $game.style.display = 'none'
+    $results.style.display = 'flex'
+
+    const correctWords = $paragraph.querySelectorAll('x-word.correct').length
+    const correctLetter = $paragraph.querySelectorAll('x-letter.correct').length
+    const incorrectLetter = $paragraph.querySelectorAll('x-letter.incorrect').length
+
+    const totalLetters = (correctLetter + incorrectLetter)
+
+    const accuracy = totalLetters > 0 
+      ? (correctLetter / totalLetters) * 100
+      : 0
+
+    const wpm = correctWords * 60 / INITIAL_TIME
+    $wpm.textContent = wpm
+    $accuracy.textContent = `${accuracy.toFixed(1)}%`
+ 
+  }
+
+</script>
+
+</html>
