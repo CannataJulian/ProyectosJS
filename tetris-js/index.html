@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/style.css" />
+    <link rel="icon" href="img/rub-white.png" />
+    <title>TetrisJS - by Spaiku</title>
+  </head>
+  <body>
+    <h2>Tetris JS</h2>
+    <div id="app">
+      <section>
+        Tetris JS <br />
+        Start Game
+      </section>
+      <canvas></canvas>
+      <div id="controls">
+        <button id="rotate">🔄</button>
+        <button id="left">⬅️</button>
+        <button id="down">⬇️</button>
+        <button id="right">➡️</button>
+      </div>
+    </div>
+    <strong>Puntuación: <span></span></strong>
+    <script type="module" src="/main.js"></script>
+  </body>
+
+  <style>
+    :root {
+      font-family: monospace, system-ui, Avenir, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      font-weight: 400;
+      color-scheme: light dark;
+      color: rgba(255, 255, 255, 0.87);
+      background-color: #242424;
+    }
+
+    h1 {
+      font-size: 3.2em;
+      line-height: 1.1;
+    }
+
+    #app {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      display: grid;
+      place-content: center;
+      place-items: center;
+      min-width: 320px;
+      min-height: 100vh;
+    }
+
+    section {
+      position: absolute;
+      background-color: black;
+      top: 0;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      font-size: 24px;
+      cursor: pointer;
+    }
+
+    #controls {
+      display: grid;
+      grid-template-columns: repeat(4, 2fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    #controls button {
+      padding: 15px;
+      font-size: 24px;
+      background-color: #333;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    #controls button:active {
+      background-color: #555;
+    }
+  </style>
+
+  <script>
+    const BLOCK_SIZE = 20;
+    const BOARD_WIDTH = 14;
+    const BOARD_HEIGHT = 30;
+
+    const EVENT_MOVEMENTS = {
+      LEFT: "ArrowLeft",
+      RIGHT: "ArrowRight",
+      DOWN: "ArrowDown",
+      ROTATE: "ArrowUp",
+    };
+
+    const canvas = document.querySelector("canvas");
+    const context = canvas.getContext("2d");
+    const $score = document.querySelector("span");
+
+    let score = 0;
+
+    canvas.width = BLOCK_SIZE * BOARD_WIDTH;
+    canvas.height = BLOCK_SIZE * BOARD_HEIGHT;
+
+    context.scale(BLOCK_SIZE, BLOCK_SIZE);
+
+    const board = createBoard(BOARD_WIDTH, BOARD_HEIGHT);
+
+    function createBoard(width, height) {
+      return Array(height)
+        .fill()
+        .map(() => Array(width).fill(0));
+    }
+
+    let dropCounter = 0;
+    let lastTime = 0;
+
+    function update(time = 0) {
+      const deltaTime = time - lastTime;
+      lastTime = time;
+
+      dropCounter += deltaTime;
+
+      if (dropCounter > 1000) {
+        piece.position.y++;
+        dropCounter = 0;
+
+        if (checkCollision()) {
+          piece.position.y--;
+          solidifyPiece();
+          removeRows();
+        }
+      }
+
+      draw();
+      window.requestAnimationFrame(update);
+    }
+
+    const piece = {
+      position: { x: 5, y: 5 },
+      shape: [
+        [1, 1],
+        [1, 1],
+      ],
+    };
+
+    const PIECES = [
+      [
+        [1, 1],
+        [1, 1],
+      ],
+      [[1, 1, 1, 1]],
+      [
+        [0, 1, 0],
+        [1, 1, 1],
+      ],
+      [
+        [0, 1, 1],
+        [1, 1, 0],
+      ],
+      [
+        [1, 1, 0],
+        [0, 1, 1],
+      ],
+      [
+        [1, 0],
+        [1, 0],
+        [1, 1],
+      ],
+      [
+        [0, 1],
+        [0, 1],
+        [1, 1],
+      ],
+    ];
+
+    function draw() {
+      context.fillStyle = "#000";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      board.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value === 1) {
+            context.fillStyle = "#fff";
+            context.fillRect(x, y, 1, 1);
+          }
+        });
+      });
+
+      piece.shape.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value === 1) {
+            context.fillStyle = "red";
+            context.fillRect(piece.position.x + x, piece.position.y + y, 1, 1);
+          }
+        });
+      });
+
+      $score.innerHTML = score;
+    }
+
+    document.addEventListener("keydown", (event) => {
+      handleInput(event.key);
+    });
+
+    const intervals = {
+      left: null,
+      right: null,
+      down: null,
+    };
+
+    // Función para manejar el inicio del movimiento continuo
+    function startTouchMovement(direction) {
+      if (!intervals[direction]) {
+        intervals[direction] = setInterval(() => {
+          if (direction === "left") {
+            piece.position.x--;
+            if (checkCollision()) {
+              piece.position.x++;
+            }
+          } else if (direction === "right") {
+            piece.position.x++;
+            if (checkCollision()) {
+              piece.position.x--;
+            }
+          } else if (direction === "down") {
+            piece.position.y++;
+            if (checkCollision()) {
+              piece.position.y--;
+              solidifyPiece();
+              removeRows();
+            }
+          }
+          draw();
+        }, 100); // Ajusta la velocidad del movimiento
+      }
+    }
+
+    // Función para detener el movimiento continuo
+    function stopTouchMovement(direction) {
+      clearInterval(intervals[direction]);
+      intervals[direction] = null;
+    }
+
+    // Configurar eventos para los botones en dispositivos táctiles
+    document
+      .getElementById("left")
+      .addEventListener("touchstart", () => startTouchMovement("left"));
+    document
+      .getElementById("left")
+      .addEventListener("touchend", () => stopTouchMovement("left"));
+    document
+      .getElementById("right")
+      .addEventListener("touchstart", () => startTouchMovement("right"));
+    document
+      .getElementById("right")
+      .addEventListener("touchend", () => stopTouchMovement("right"));
+    document
+      .getElementById("down")
+      .addEventListener("touchstart", () => startTouchMovement("down"));
+    document
+      .getElementById("down")
+      .addEventListener("touchend", () => stopTouchMovement("down"));
+
+    document
+      .getElementById("left")
+      .addEventListener("click", () => handleInput(EVENT_MOVEMENTS.LEFT));
+    document
+      .getElementById("right")
+      .addEventListener("click", () => handleInput(EVENT_MOVEMENTS.RIGHT));
+    document
+      .getElementById("down")
+      .addEventListener("click", () => handleInput(EVENT_MOVEMENTS.DOWN));
+    document
+      .getElementById("rotate")
+      .addEventListener("click", () => handleInput(EVENT_MOVEMENTS.ROTATE));
+
+    function handleInput(key) {
+      if (key === EVENT_MOVEMENTS.LEFT) {
+        piece.position.x--;
+        if (checkCollision()) {
+          piece.position.x++;
+        }
+      }
+
+      if (key === EVENT_MOVEMENTS.RIGHT) {
+        piece.position.x++;
+        if (checkCollision()) {
+          piece.position.x--;
+        }
+      }
+
+      if (key === EVENT_MOVEMENTS.DOWN) {
+        piece.position.y++;
+        if (checkCollision()) {
+          piece.position.y--;
+          solidifyPiece();
+          removeRows();
+        }
+      }
+
+      if (key === EVENT_MOVEMENTS.ROTATE) {
+        const rotated = [];
+
+        for (let i = 0; i < piece.shape[0].length; i++) {
+          const row = [];
+
+          for (let j = piece.shape.length - 1; j >= 0; j--) {
+            row.push(piece.shape[j][i]);
+          }
+
+          rotated.push(row);
+        }
+
+        const previousShape = piece.shape;
+        piece.shape = rotated;
+        if (checkCollision()) {
+          piece.shape = previousShape;
+        }
+      }
+    }
+
+    function checkCollision() {
+      return piece.shape.find((row, y) => {
+        return row.find((value, x) => {
+          return (
+            value === 1 &&
+            board[y + piece.position.y]?.[x + piece.position.x] !== 0
+          );
+        });
+      });
+    }
+
+    function solidifyPiece() {
+      piece.shape.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value === 1) {
+            board[y + piece.position.y][x + piece.position.x] = 1;
+          }
+        });
+      });
+
+      piece.position.x = Math.floor(BOARD_WIDTH / 2 - 2);
+      piece.position.y = 0;
+
+      piece.shape = PIECES[Math.floor(Math.random() * PIECES.length)];
+
+      if (checkCollision()) {
+        window.alert("Game Over!!");
+        board.forEach((row) => row.fill(0));
+        score = 0;
+      }
+    }
+
+    function removeRows() {
+      const rowsToRemove = [];
+
+      board.forEach((row, y) => {
+        if (row.every((value) => value === 1)) {
+          rowsToRemove.push(y);
+        }
+      });
+
+      rowsToRemove.forEach((y) => {
+        board.splice(y, 1);
+        const newRow = Array(BOARD_WIDTH).fill(0);
+        board.unshift(newRow);
+        score += 10;
+      });
+    }
+
+    const $section = document.querySelector("section");
+
+    $section.addEventListener("click", () => {
+      update();
+
+      $section.remove();
+      const audio = new Audio("./tetris.mp3");
+      audio.volume = 0.05;
+      audio.play();
+    });
+  </script>
+</html>
