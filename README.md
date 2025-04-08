@@ -1,4 +1,5 @@
 # ProyectosJS
 
-- Tetris (LISTO)
-- ChatGPT local
+- TetrisJS (Listo)
+- Clon de Monkey Type (Listo)
+- JS Benchmark (En proceso)
